@@ -2,6 +2,7 @@ package anhiutangerine.prettiembee.data.repository
 
 import android.content.Context
 import android.net.Uri
+import anhiutangerine.prettiembee.R
 import anhiutangerine.prettiembee.data.model.CommunityTheme
 import anhiutangerine.prettiembee.data.model.MbStoreTheme
 import kotlinx.coroutines.CancellationException
@@ -43,11 +44,11 @@ class ThemeRepository(
     }
 
     fun getThemeDir(themeId: String): File {
-        require(isSafeThemeId(themeId)) { "ID theme không hợp lệ" }
+        require(isSafeThemeId(themeId)) { context.getString(R.string.error_invalid_theme_id) }
         val root = getThemesDirectory().canonicalFile
-        require(root == File(context.filesDir.canonicalFile, "themes")) { "Thư mục theme không an toàn" }
+        require(root == File(context.filesDir.canonicalFile, "themes")) { context.getString(R.string.error_unsafe_theme_dir) }
         val dir = File(root, themeId)
-        require(dir.canonicalFile == dir) { "Thư mục theme không an toàn" }
+        require(dir.canonicalFile == dir) { context.getString(R.string.error_unsafe_theme_dir) }
         return dir
     }
 
@@ -80,13 +81,13 @@ class ThemeRepository(
 
     private fun deleteThemeDirectory(dir: File) {
         // Recheck containment at deletion time, including symlinks inside a theme.
-        require(getThemeDir(dir.name) == dir.canonicalFile) { "Thư mục theme không an toàn" }
+        require(getThemeDir(dir.name) == dir.canonicalFile) { context.getString(R.string.error_unsafe_theme_dir) }
         val prefix = dir.canonicalPath + File.separator
         dir.walkTopDown().forEach { file ->
-            require(file == dir || file.canonicalPath.startsWith(prefix)) { "Đường dẫn theme không an toàn" }
-            require(file.canonicalFile == file.absoluteFile) { "Liên kết theme không an toàn" }
+            require(file == dir || file.canonicalPath.startsWith(prefix)) { context.getString(R.string.error_unsafe_theme_path) }
+            require(file.canonicalFile == file.absoluteFile) { context.getString(R.string.error_unsafe_theme_link) }
         }
-        if (dir.exists() && !dir.deleteRecursively()) throw IOException("Không thể xoá theme: ${dir.name}")
+        if (dir.exists() && !dir.deleteRecursively()) throw IOException(context.getString(R.string.error_delete_theme, dir.name))
     }
 
     private fun removeFromCustomThemes(themeId: String) {
@@ -187,7 +188,7 @@ class ThemeRepository(
         theme: CommunityTheme,
         onProgress: (Float) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
-        val downloadUrl = theme.downloadUrl ?: return@withContext Result.failure(Exception("Theme không có link tải trực tiếp"))
+        val downloadUrl = theme.downloadUrl ?: return@withContext Result.failure(Exception(context.getString(R.string.error_no_download_url)))
         var tempZip: File? = null
         var partialDir: File? = null
         var completed = false
@@ -212,7 +213,7 @@ class ThemeRepository(
 
             currentCoroutineContext().ensureActive()
             partialDir = stagingDir
-            check(stagingDir.mkdirs()) { "Không thể tạo thư mục theme tạm" }
+            check(stagingDir.mkdirs()) { context.getString(R.string.error_create_staging) }
             unzipFile(tempZip, stagingDir)
             normalizeExtractedStructure(stagingDir)
 
@@ -223,8 +224,11 @@ class ThemeRepository(
                     .orEmpty()
                 return@withContext Result.failure(
                     Exception(
-                        "ZIP không đúng cấu trúc (cần images/*.png + theme/token.json)" +
-                            if (listing.isNotBlank()) ". Nội dung sau giải nén: $listing" else ""
+                        if (listing.isNotBlank()) {
+                            context.getString(R.string.error_zip_contents, listing)
+                        } else {
+                            context.getString(R.string.error_zip_structure)
+                        }
                     )
                 )
             }
@@ -258,10 +262,10 @@ class ThemeRepository(
                 FileOutputStream(tempZip).use { output ->
                     copyCancellable(input, output)
                 }
-            } ?: return@withContext Result.failure(Exception("Không thể đọc file ZIP từ bộ nhớ máy"))
+            } ?: return@withContext Result.failure(Exception(context.getString(R.string.error_zip_read)))
 
             currentCoroutineContext().ensureActive()
-            check(destDir.mkdir()) { "Không thể tạo thư mục theme" }
+            check(destDir.mkdir()) { context.getString(R.string.error_create_theme_dir) }
             partialDir = destDir
             unzipFile(tempZip, destDir)
 
@@ -270,7 +274,7 @@ class ThemeRepository(
 
             if (!hasValidThemeLayout(destDir)) {
                 return@withContext Result.failure(
-                    Exception("File ZIP không hợp lệ: cần images/*.png và theme/token.json")
+                    Exception(context.getString(R.string.error_zip_invalid))
                 )
             }
 
@@ -278,14 +282,14 @@ class ThemeRepository(
 
             val newTheme = CommunityTheme(
                 id = customId,
-                name = cleanName.ifBlank { "Theme Tuỳ Chỉnh" },
-                series = "Tự nạp (Custom)",
-                author = "Người dùng",
-                description = "Theme nhập từ file ZIP ngoài thiết bị.",
+                name = cleanName.ifBlank { context.getString(R.string.custom_theme_name) },
+                series = context.getString(R.string.custom_theme_series),
+                author = context.getString(R.string.custom_theme_author),
+                description = context.getString(R.string.custom_theme_description),
                 defaultTargetUuid = "aa3cb89a-8325-41b4-b59b-dfaea086cf80",
                 supportsPriority = hasPriority,
                 downloadUrl = null,
-                fileSize = "Nội bộ",
+                fileSize = context.getString(R.string.custom_theme_size),
                 isCustomImport = true
             )
 
@@ -328,11 +332,11 @@ class ThemeRepository(
         try {
             currentCoroutineContext().ensureActive()
             if (destDir.exists()) {
-                check(destDir.renameTo(backupDir)) { "Không thể sao lưu theme hiện tại" }
+                check(destDir.renameTo(backupDir)) { context.getString(R.string.error_backup_theme) }
                 backedUp = true
             }
             currentCoroutineContext().ensureActive()
-            check(stagingDir.renameTo(destDir)) { "Không thể công bố theme đã tải" }
+            check(stagingDir.renameTo(destDir)) { context.getString(R.string.error_publish_theme) }
             if (backedUp) {
                 try {
                     deleteThemeDirectory(backupDir)
@@ -351,7 +355,7 @@ class ThemeRepository(
         var url = URL(address)
         repeat(6) { redirects ->
             currentCoroutineContext().ensureActive()
-            require(url.protocol == "http" || url.protocol == "https") { "URL theme không hợp lệ" }
+            require(url.protocol == "http" || url.protocol == "https") { context.getString(R.string.error_invalid_theme_url) }
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 this.connectTimeout = connectTimeout
                 this.readTimeout = readTimeout
@@ -363,11 +367,11 @@ class ThemeRepository(
                 currentCoroutineContext().ensureActive()
                 if (code in listOf(301, 302, 303, 307, 308)) {
                     val location = conn.getHeaderField("Location")
-                    if (redirects == 5) throw IOException("Quá nhiều chuyển hướng HTTP")
-                    if (location.isNullOrBlank()) throw IOException("HTTP $code thiếu Location")
+                    if (redirects == 5) throw IOException(context.getString(R.string.error_too_many_redirects))
+                    if (location.isNullOrBlank()) throw IOException(context.getString(R.string.error_redirect_location, code))
                     val next = URL(url, location)
                     if (url.protocol == "https" && next.protocol != "https") {
-                        throw IOException("Chuyển hướng HTTPS không an toàn")
+                        throw IOException(context.getString(R.string.error_https_downgrade))
                     }
                     url = next
                 } else {
@@ -379,7 +383,7 @@ class ThemeRepository(
                 if (!handedOff) conn.disconnect()
             }
         }
-        throw IOException("Quá nhiều chuyển hướng HTTP")
+        throw IOException(context.getString(R.string.error_too_many_redirects))
     }
 
     private suspend fun copyCancellable(input: InputStream, output: OutputStream, onBytes: (Long) -> Unit = {}) {

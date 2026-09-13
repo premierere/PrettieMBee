@@ -2,7 +2,6 @@ package anhiutangerine.prettiembee.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,7 +101,7 @@ fun StatusCard(
                             .allowHardware(false)
                             .crossfade(true)
                             .build(),
-                        contentDescription = "Ảnh nền theme đang cài: $appliedNewTheme",
+                        contentDescription = stringResource(R.string.status_theme_preview_desc, appliedNewTheme.orEmpty()),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
@@ -120,26 +119,14 @@ fun StatusCard(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_prettiembee_logo),
-                                contentDescription = "PrettieMBee Cat",
-                                modifier = Modifier.size(40.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = if (isRootGranted && isMbInstalled) "Đã cài đặt" else {
+                            text = if (isRootGranted && isMbInstalled) {
+                                stringResource(R.string.status_theme_installed)
+                            } else {
                                 when {
-                                    !isRootGranted -> "Chưa có quyền root"
-                                    !isMbInstalled -> "Chưa cài đặt"
-                                    else -> "Sẵn sàng"
+                                    !isRootGranted -> stringResource(R.string.status_root_missing)
+                                    !isMbInstalled -> stringResource(R.string.status_mb_missing)
+                                    else -> stringResource(R.string.status_ready)
                                 }
                             },
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -149,9 +136,12 @@ fun StatusCard(
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        val prioSuffix = if (appliedIsPriority) " - Prio" else ""
                         Text(
-                            text = "$appliedNewTheme - $appliedOriginalTheme$prioSuffix",
+                            text = if (appliedIsPriority) {
+                                stringResource(R.string.status_applied_theme_prio, appliedNewTheme.orEmpty(), appliedOriginalTheme.orEmpty())
+                            } else {
+                                stringResource(R.string.status_applied_theme_label, appliedNewTheme.orEmpty(), appliedOriginalTheme.orEmpty())
+                            },
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 12.sp
@@ -171,32 +161,11 @@ fun StatusCard(
                         .padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(
-                                if (backgroundUri != null)
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                                else
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_prettiembee_logo),
-                            contentDescription = "PrettieMBee Cat",
-                            modifier = Modifier.size(54.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     val statusText = when {
-                        !isRootGranted -> "Chưa có quyền root"
-                        !isMbInstalled -> "Chưa cài đặt"
-                        isThemeInstalled -> "Đã cài đặt"
-                        else -> "Sẵn sàng"
+                        !isRootGranted -> stringResource(R.string.status_root_missing)
+                        !isMbInstalled -> stringResource(R.string.status_mb_missing)
+                        isThemeInstalled -> stringResource(R.string.status_theme_installed)
+                        else -> stringResource(R.string.status_ready)
                     }
 
                     Text(
@@ -211,8 +180,11 @@ fun StatusCard(
 
                     if (isThemeInstalled && isRootGranted && isMbInstalled) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        val prioSuffix = if (appliedIsPriority) " - Prio" else ""
-                        val subtitleText = "$appliedNewTheme - $appliedOriginalTheme$prioSuffix"
+                        val subtitleText = if (appliedIsPriority) {
+                            stringResource(R.string.status_applied_theme_prio, appliedNewTheme.orEmpty(), appliedOriginalTheme.orEmpty())
+                        } else {
+                            stringResource(R.string.status_applied_theme_label, appliedNewTheme.orEmpty(), appliedOriginalTheme.orEmpty())
+                        }
                         Text(
                             text = subtitleText,
                             style = MaterialTheme.typography.bodyMedium.copy(

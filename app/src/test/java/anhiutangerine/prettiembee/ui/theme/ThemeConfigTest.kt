@@ -3,6 +3,7 @@ package anhiutangerine.prettiembee.ui.theme
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import anhiutangerine.prettiembee.R
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Before
@@ -42,5 +43,12 @@ class ThemeConfigTest {
         ThemeConfig.saveAppBackground(context, Uri.fromFile(File(context.cacheDir, "missing.jpg")))
         assertEquals(previous, ThemeConfig.appBackgroundUri)
         assertEquals("original bytes", File(previous.path!!).readText())
+    }
+
+    @Test fun savedLocaleWrapsResourcesForEnglishAndVietnamese() {
+        ThemeConfig.saveAppLanguage(context, "vi")
+        assertEquals("Trang chủ", ThemeConfig.applyLocale(context).getString(R.string.nav_home))
+        ThemeConfig.saveAppLanguage(context, "en")
+        assertEquals("Home", ThemeConfig.applyLocale(context).getString(R.string.nav_home))
     }
 }

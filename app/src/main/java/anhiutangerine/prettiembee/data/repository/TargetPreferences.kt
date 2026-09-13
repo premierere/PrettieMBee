@@ -1,9 +1,10 @@
 package anhiutangerine.prettiembee.data.repository
 
 import android.content.Context
+import anhiutangerine.prettiembee.R
 
 /** Persist the chosen package and a separate target UUID for each package. */
-class TargetPreferences(context: Context) {
+class TargetPreferences(private val context: Context) {
     private val prefs = context.getSharedPreferences("prettiembee_target_prefs", Context.MODE_PRIVATE)
 
     val targetPackage: String
@@ -11,7 +12,7 @@ class TargetPreferences(context: Context) {
             ?.takeIf { RootRepository.isValidPackageName(it) } ?: "com.mbmobile"
 
     fun savePackage(value: String) {
-        require(RootRepository.isValidPackageName(value)) { "Tên gói ứng dụng không hợp lệ" }
+        require(RootRepository.isValidPackageName(value)) { context.getString(R.string.error_invalid_package) }
         prefs.edit().putString("package", value).apply()
     }
 
@@ -22,7 +23,7 @@ class TargetPreferences(context: Context) {
     }
 
     fun saveTarget(packageName: String, uuid: String, name: String) {
-        require(RootRepository.isValidPackageName(packageName)) { "Tên gói ứng dụng không hợp lệ" }
+        require(RootRepository.isValidPackageName(packageName)) { context.getString(R.string.error_invalid_package) }
         require(uuid.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))
         prefs.edit().putString("$packageName.uuid", uuid).putString("$packageName.name", name).apply()
     }

@@ -1,5 +1,6 @@
 package anhiutangerine.prettiembee
 
+import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -15,6 +16,10 @@ import anhiutangerine.prettiembee.ui.theme.PrettieMBeeTheme
 import anhiutangerine.prettiembee.ui.theme.ThemeConfig
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(ThemeConfig.applyLocale(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeConfig.load(applicationContext)
@@ -29,7 +34,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) { model.refresh() }
                 LaunchedEffect(model.message) {
                     model.message?.let {
-                        Toast.makeText(applicationContext, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show()
                         model.message = null
                     }
                 }
@@ -58,7 +63,10 @@ class MainActivity : ComponentActivity() {
                         onTogglePin = { ThemeConfig.togglePinnedTheme(applicationContext, it.id) },
                         onDeleteDownloaded = { model.deleteDownloaded(it) },
                         onImportZip = { uri, name -> model.importZip(uri, name) },
-                        onResetThemes = { model.resetThemes() }
+                        onResetThemes = { model.resetThemes() },
+                        onLanguageChange = { tag ->
+                            ThemeConfig.saveAppLanguage(this@MainActivity, tag)
+                        }
                     )
                 }
                 model.selectedTheme?.let { theme ->

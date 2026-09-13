@@ -34,12 +34,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import anhiutangerine.prettiembee.BuildConfig
+import anhiutangerine.prettiembee.R
 import anhiutangerine.prettiembee.data.model.InjectConfig
 import anhiutangerine.prettiembee.ui.theme.AppThemeMode
 import anhiutangerine.prettiembee.ui.theme.ErrorRed
@@ -67,15 +69,16 @@ object FlashScreenConstants {
     fun createInitialLogs(
         config: InjectConfig,
         currentTargetName: String,
-        targetPackage: String
+        targetPackage: String,
+        context: android.content.Context
     ): List<String> {
         val list = mutableListOf<String>()
         ASCII_BANNER.lines().forEach { list.add(it) }
         list.add("")
-        list.add("- Phiên bản: v1.0 (${BuildConfig.GIT_HASH})")
-        list.add("- Nguồn theme: ${config.sourceTheme.name}")
-        list.add("- Vị trí áp dụng: $currentTargetName")
-        list.add("- Gói đích: $targetPackage")
+        list.add("- ${context.getString(R.string.flash_log_version, BuildConfig.GIT_HASH)}")
+        list.add("- ${context.getString(R.string.flash_log_source, config.sourceTheme.name)}")
+        list.add("- ${context.getString(R.string.flash_log_target, currentTargetName)}")
+        list.add("- ${context.getString(R.string.flash_log_package, targetPackage)}")
         list.add("")
         return list
     }
@@ -99,7 +102,7 @@ fun FlashScreen(
     // Prevent accidental back navigation while flashing
     BackHandler(enabled = true) {
         if (status == FlashingStatus.FLASHING) {
-            Toast.makeText(context, "Đang nạp theme, vui lòng không thoát...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.flash_in_progress), Toast.LENGTH_SHORT).show()
         } else {
             onBack()
         }
@@ -138,9 +141,9 @@ fun FlashScreen(
                         Column {
                             Text(
                                 text = when (status) {
-                                    FlashingStatus.FLASHING -> "Đang cài đặt theme"
-                                    FlashingStatus.SUCCESS -> "Cài đặt thành công"
-                                    FlashingStatus.FAILED -> "Cài đặt thất bại"
+                                    FlashingStatus.FLASHING -> stringResource(R.string.flash_in_progress)
+                                    FlashingStatus.SUCCESS -> stringResource(R.string.flash_success_title)
+                                    FlashingStatus.FAILED -> stringResource(R.string.flash_failed_title)
                                 },
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = statusColor
@@ -156,7 +159,7 @@ fun FlashScreen(
                         IconButton(
                             onClick = {
                                 if (status == FlashingStatus.FLASHING) {
-                                    Toast.makeText(context, "Đang nạp theme, vui lòng không thoát...", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.flash_in_progress), Toast.LENGTH_SHORT).show()
                                 } else {
                                     onBack()
                                 }
@@ -164,7 +167,7 @@ fun FlashScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.ArrowBack,
-                                contentDescription = "Quay lại",
+                                contentDescription = stringResource(R.string.flash_back),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -173,7 +176,7 @@ fun FlashScreen(
                         IconButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(fullLogText))
-                                Toast.makeText(context, "Đã sao chép toàn bộ nhật ký cài đặt!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.flash_copied), Toast.LENGTH_SHORT).show()
 
                                 try {
                                     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -187,7 +190,7 @@ fun FlashScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.ContentCopy,
-                                contentDescription = "Sao chép nhật ký",
+                                contentDescription = stringResource(R.string.flash_copy_log),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -210,12 +213,12 @@ fun FlashScreen(
                             icon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
-                                    contentDescription = "Đóng"
+                                    contentDescription = stringResource(R.string.action_close)
                                 )
                             },
                             text = {
                                 Text(
-                                    text = "Đóng",
+                                    text = stringResource(R.string.action_close),
                                     fontWeight = FontWeight.Bold
                                 )
                             },
@@ -310,27 +313,12 @@ private fun FlashProgressBarCard(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = themeName.ifEmpty { "MB Bank Theme" },
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = when (status) {
-                        FlashingStatus.FLASHING -> "1/1"
-                        FlashingStatus.SUCCESS -> "Hoàn tất"
-                        FlashingStatus.FAILED -> "Lỗi"
-                    },
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = progressColor
-                )
-            }
+            Text(
+                text = themeName.ifEmpty { stringResource(R.string.app_name) },
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -371,7 +359,7 @@ private fun FlashProgressBarCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Chi tiết lỗi",
+                            text = stringResource(R.string.flash_failed_title),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = ErrorRed
                         )

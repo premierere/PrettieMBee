@@ -93,13 +93,13 @@ class MainViewModel(
                 throw e
             } catch (e: Exception) {
                 installedThemes = emptyList()
-                message = "Không thể làm mới dữ liệu: ${e.message}"
+                message = context.getString(R.string.error_refresh_failed, e.message ?: "")
             }
         }.also { refreshJob = it }
     }
 
     fun changePackage(value: String) {
-        if (isBusy) { message = "Vui lòng đợi tác vụ hiện tại hoàn tất"; return }
+        if (isBusy) { message = context.getString(R.string.error_operation_in_progress); return }
         val pkg = value.trim()
         if (pkg == targetPackage) return
         try {
@@ -119,7 +119,7 @@ class MainViewModel(
             // A remembered installation for another app is not evidence for this package.
             ThemeConfig.clearAppliedTheme(context)
             refresh()
-        } catch (e: Exception) { message = "Gói ứng dụng không hợp lệ: ${e.message}" }
+        } catch (e: Exception) { message = context.getString(R.string.error_invalid_package_detail, e.message ?: "") }
     }
 
     fun selectTheme(theme: CommunityTheme) {
@@ -148,7 +148,7 @@ class MainViewModel(
             downloadedThemeIds = downloadedThemeIds - theme.id
             if (theme.isCustomImport) communityThemes = communityThemes.filterNot { it.id == theme.id }
         } catch (e: CancellationException) { throw e
-        } catch (e: Exception) { message = "Không thể xoá bản tải: ${e.message}"
+        } catch (e: Exception) { message = context.getString(R.string.error_delete_download, e.message ?: "")
         } finally { isBusy = false }
     }
 
@@ -161,15 +161,15 @@ class MainViewModel(
             communityThemes = communityThemes + imported
             downloadedThemeIds = downloadedThemeIds + imported.id
             selectedTheme = imported
-            message = "Nạp theme thành công!"
+            message = context.getString(R.string.toast_import_success)
         } catch (e: CancellationException) { throw e
-        } catch (e: Exception) { message = "Lỗi nạp ZIP: ${e.message}"
+        } catch (e: Exception) { message = context.getString(R.string.error_import_zip, e.message ?: "")
         } finally { isBusy = false }
     }
 
     /** Reset runs in the ViewModel scope even if the confirmation UI is recreated. */
     suspend fun resetThemes(): Result<Unit> = viewModelScope.async {
-        if (isBusy) return@async Result.failure(IllegalStateException("Một tác vụ khác đang chạy"))
+        if (isBusy) return@async Result.failure(IllegalStateException(context.getString(R.string.error_operation_in_progress)))
         isBusy = true
         try {
             refreshJob?.cancelAndJoin()
@@ -195,42 +195,44 @@ class MainViewModel(
         flashingStatus = FlashingStatus.FLASHING
         flashFailedReason = null
         injectLogs.clear()
-        injectLogs.addAll(FlashScreenConstants.createInitialLogs(config, activeTargetName, repository.targetPackage))
+        injectLogs.addAll(FlashScreenConstants.createInitialLogs(config, activeTargetName, repository.targetPackage, context))
         isFlashScreenOpen = true
         try {
             refreshJob?.cancelAndJoin()
-            check(repository.isRootAvailable()) { "Ứng dụng chưa được cấp quyền Root" }
-            check(repository.isMbInstalled()) { "Chưa cài đặt ứng dụng mục tiêu" }
+            check(repository.isRootAvailable()) { context.getString(R.string.error_root_required) }
+            check(repository.isMbInstalled()) { context.getString(R.string.error_target_not_installed) }
             val local = withContext(Dispatchers.IO) { themeRepository.isThemeDownloaded(config.sourceTheme) }
             val themeDir = if (local) themeRepository.getThemeDir(config.sourceTheme.id) else {
-                injectLogs.add("- Đang tải theme từ máy chủ...")
+                injectLogs.add("- ${context.getString(R.string.flash_log_downloading)}")
                 var lastPercent = -1
                 themeRepository.downloadTheme(config.sourceTheme) { progress ->
                     val percent = (progress * 100).toInt().coerceIn(0, 100)
                     if (percent / 25 > lastPercent / 25 || lastPercent < 0) {
                         lastPercent = percent
-                        viewModelScope.launch(Dispatchers.Main.immediate) { injectLogs.add("- Tiến độ tải: $percent%") }
+                        viewModelScope.launch(Dispatchers.Main.immediate) {
+                            injectLogs.add("- ${context.getString(R.string.flash_log_progress, percent)}")
+                        }
                     }
                 }.getOrThrow()
             }
             val result = repository.injectTheme(config, themeDir) { line ->
                 viewModelScope.launch(Dispatchers.Main.immediate) { injectLogs.add(line) }
             }
-            check(result.isSuccess) { result.errorMessage ?: "Nạp theme thất bại" }
+            check(result.isSuccess) { result.errorMessage ?: context.getString(R.string.operation_failed) }
             ThemeConfig.saveAppliedTheme(context, config.sourceTheme.name, activeTargetName,
                 config.usePriorityVariant, config.sourceTheme.id)
             flashingStatus = FlashingStatus.SUCCESS
             if (config.autoLaunchDeeplink) {
                 repository.launchMbBank(true, config.targetUuid).exceptionOrNull()?.let {
-                    injectLogs.add("[Cảnh báo] Theme đã nạp, nhưng không thể mở MB Bank: ${it.message}")
-                    message = "Theme đã nạp. Hãy mở MB Bank thủ công."
+                    injectLogs.add(context.getString(R.string.warning_launch_failed, it.message ?: ""))
+                    message = context.getString(R.string.warning_launch_manually)
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            flashFailedReason = e.message ?: "Có lỗi xảy ra trong quá trình cài đặt"
-            injectLogs.add("[Lỗi] $flashFailedReason")
+            flashFailedReason = e.message ?: context.getString(R.string.operation_failed)
+            injectLogs.add("${context.getString(R.string.log_tag_error)} $flashFailedReason")
             flashingStatus = FlashingStatus.FAILED
         } finally {
             isBusy = false

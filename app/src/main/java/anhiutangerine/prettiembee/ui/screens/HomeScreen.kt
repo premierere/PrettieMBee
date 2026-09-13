@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.FormatColorFill
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Palette
@@ -59,6 +60,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -128,17 +130,21 @@ fun HomeScreen(
     onDeleteDownloaded: (CommunityTheme) -> Unit,
     onImportZip: (Uri, String) -> Unit,
     onResetThemes: (suspend () -> Result<Unit>)? = null,
+    onLanguageChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
-    var selectedCategory by remember { mutableStateOf("Tất cả") }
+    val allCategoryKey = "ALL"
+    val allCategoryLabel = stringResource(R.string.store_all)
+    var selectedCategory by remember { mutableStateOf(allCategoryKey) }
     var searchQuery by remember { mutableStateOf("") }
     var showPackageDialog by remember { mutableStateOf(false) }
     var showThemeModeDialog by remember { mutableStateOf(false) }
     var showDpiDialog by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var isResettingThemes by remember { mutableStateOf(false) }
     var tempPackageInput by remember { mutableStateOf(targetPackage) }
     var tempDpiInput by remember { mutableIntStateOf(ThemeConfig.appDpi) }
@@ -149,7 +155,11 @@ fun HomeScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             val saved = ThemeConfig.saveStatusCardBackground(context, uri)
-            Toast.makeText(context, if (saved) "Đã cập nhật ảnh nền Status Card" else "Không thể đọc ảnh đã chọn", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                context.getString(if (saved) R.string.toast_status_bg_set else R.string.error_image_unreadable),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -158,7 +168,11 @@ fun HomeScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             val saved = ThemeConfig.saveAppBackground(context, uri)
-            Toast.makeText(context, if (saved) "Đã áp dụng hình nền toàn ứng dụng" else "Không thể đọc ảnh đã chọn", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                context.getString(if (saved) R.string.toast_app_bg_set else R.string.error_image_unreadable),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -177,7 +191,7 @@ fun HomeScreen(
     }
 
     val categories = remember(communityThemes) {
-        listOf("Tất cả") + communityThemes.map { it.series }.distinct()
+        listOf(allCategoryKey) + communityThemes.map { it.series }.distinct()
     }
 
     val zipPickerLauncher = rememberLauncherForActivityResult(
@@ -189,6 +203,47 @@ fun HomeScreen(
         }
     }
 
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = { Text(stringResource(R.string.settings_language)) },
+            text = {
+                Column {
+                    listOf("en" to R.string.language_english, "vi" to R.string.language_vietnamese).forEach { (tag, labelRes) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    showLanguageDialog = false
+                                    if (ThemeConfig.appLanguageTag != tag) onLanguageChange(tag)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = ThemeConfig.appLanguageTag == tag,
+                                onClick = {
+                                    showLanguageDialog = false
+                                    if (ThemeConfig.appLanguageTag != tag) onLanguageChange(tag)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(labelRes))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
     if (showPackageDialog) {
         AlertDialog(
             onDismissRequest = { showPackageDialog = false },
@@ -196,7 +251,7 @@ fun HomeScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
                 Text(
-                    text = "Đổi gói MB Bank mục tiêu",
+                    text = stringResource(R.string.package_dialog_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -205,7 +260,7 @@ fun HomeScreen(
             text = {
                 Column {
                     Text(
-                        text = "Mặc định là 'com.mbmobile'. Nếu bạn dùng ứng dụng kép (Dual App) hoặc bản Clone, hãy nhập package tương ứng:",
+                        text = stringResource(R.string.default_package_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -231,7 +286,7 @@ fun HomeScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("Lưu", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_save), fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -239,7 +294,7 @@ fun HomeScreen(
                     onClick = { showPackageDialog = false },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Huỷ")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -252,7 +307,7 @@ fun HomeScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
                 Text(
-                    text = "Chế độ giao diện",
+                    text = stringResource(R.string.theme_mode_dialog_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -285,7 +340,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = mode.title,
+                                text = stringResource(mode.titleRes),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 ),
@@ -300,7 +355,7 @@ fun HomeScreen(
                     onClick = { showThemeModeDialog = false },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Đóng")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )
@@ -313,7 +368,7 @@ fun HomeScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
                 Text(
-                    text = "Mật độ hiển thị (DPI)",
+                    text = stringResource(R.string.dpi_dialog_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -322,18 +377,18 @@ fun HomeScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Điều chỉnh tỷ lệ giao diện riêng cho PrettieMBee:",
+                        text = stringResource(R.string.dpi_dialog_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
 
                     val presets = listOf(
-                        0 to "Mặc định (Theo hệ thống)",
-                        320 to "Nhỏ (320 DPI)",
-                        380 to "Chuẩn (380 DPI)",
-                        420 to "Vừa (420 DPI)",
-                        480 to "Lớn (480 DPI)"
+                        0 to stringResource(R.string.dpi_value),
+                        320 to stringResource(R.string.dpi_preset_small),
+                        380 to stringResource(R.string.dpi_preset_default),
+                        420 to stringResource(R.string.dpi_preset_medium),
+                        480 to stringResource(R.string.dpi_preset_large)
                     )
 
                     presets.forEach { (presetDpi, label) ->
@@ -372,11 +427,11 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Tuỳ chỉnh:",
+                            text = stringResource(R.string.dpi_custom),
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Text(
-                            text = if (tempDpiInput <= 0) "Mặc định" else "$tempDpiInput DPI",
+                            text = if (tempDpiInput <= 0) stringResource(R.string.dpi_value) else stringResource(R.string.dpi_value_named, tempDpiInput),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -401,7 +456,7 @@ fun HomeScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("Áp dụng", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_apply), fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -409,7 +464,7 @@ fun HomeScreen(
                     onClick = { showDpiDialog = false },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Huỷ")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -424,7 +479,7 @@ fun HomeScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
                 Text(
-                    text = "Khôi phục theme mặc định?",
+                    text = stringResource(R.string.reset_dialog_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -433,7 +488,7 @@ fun HomeScreen(
             },
             text = {
                 Text(
-                    text = "Thao tác này sẽ đóng ứng dụng MB Bank và xoá sạch toàn bộ các theme tuỳ chỉnh đã cài đặt, đưa giao diện MB Bank về mặc định ban đầu của ngân hàng.",
+                    text = stringResource(R.string.reset_dialog_message),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -448,11 +503,11 @@ fun HomeScreen(
                                     val res = onResetThemes()
                                     showResetConfirmDialog = false
                                     if (res.isSuccess) {
-                                        Toast.makeText(context, "Đã xoá toàn bộ theme và khôi phục mặc định thành công!", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(context, context.getString(R.string.reset_success), Toast.LENGTH_LONG).show()
                                         onRefreshStatus()
                                     } else {
-                                        val err = res.exceptionOrNull()?.message ?: "Thao tác thất bại"
-                                        Toast.makeText(context, "Lỗi: $err", Toast.LENGTH_LONG).show()
+                                        val err = res.exceptionOrNull()?.message ?: context.getString(R.string.operation_failed)
+                                        Toast.makeText(context, context.getString(R.string.error_generic, err), Toast.LENGTH_LONG).show()
                                     }
                                 } finally {
                                     isResettingThemes = false
@@ -475,7 +530,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Xoá và khôi phục", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_reset_themes), fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -484,7 +539,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(12.dp),
                     enabled = !isResettingThemes
                 ) {
-                    Text("Huỷ")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -510,14 +565,14 @@ fun HomeScreen(
                                 Box(contentAlignment = Alignment.Center) {
                                     Image(
                                         painter = painterResource(id = R.drawable.ic_prettiembee_logo),
-                                        contentDescription = "Logo",
+                                        contentDescription = stringResource(R.string.home_title),
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
 
                             Text(
-                                text = "PrettieMBee",
+                                text = stringResource(R.string.home_title),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 17.sp
@@ -541,7 +596,7 @@ fun HomeScreen(
                     IconButton(onClick = onRefreshStatus) {
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
-                            contentDescription = "Refresh",
+                            contentDescription = stringResource(R.string.action_refresh),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -592,23 +647,23 @@ fun HomeScreen(
 
                             item {
                                 SegmentedGroup(
-                                    title = "Thông tin hệ thống"
+                                    title = stringResource(R.string.home_system_info)
                                 ) {
                                     val mbVersion = remember(isMbInstalled, targetPackage) {
                                         if (!isMbInstalled) {
-                                            "Chưa cài đặt"
+                                            context.getString(R.string.status_mb_missing)
                                         } else {
                                             try {
                                                 val pInfo = context.packageManager.getPackageInfo(targetPackage, 0)
-                                                pInfo.versionName ?: "Đã cài đặt"
+                                                pInfo.versionName ?: context.getString(R.string.status_theme_installed)
                                             } catch (e: Exception) {
-                                                "Đã cài đặt"
+                                                context.getString(R.string.status_theme_installed)
                                             }
                                         }
                                     }
 
                                     SegmentedItem(
-                                        title = "Phiên bản MB Bank",
+                                        title = stringResource(R.string.home_mb_version),
                                         subtitle = mbVersion,
                                         icon = Icons.Rounded.AccountBalance,
                                         iconTint = MaterialTheme.colorScheme.primary,
@@ -616,8 +671,8 @@ fun HomeScreen(
                                     )
 
                                     SegmentedItem(
-                                        title = "Phiên bản Android",
-                                        subtitle = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+                                        title = stringResource(R.string.home_android_version),
+                                        subtitle = stringResource(R.string.home_android_version_value, Build.VERSION.RELEASE, Build.VERSION.SDK_INT),
                                         icon = Icons.Rounded.Android,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         showDivider = true
@@ -630,7 +685,7 @@ fun HomeScreen(
                                     }
 
                                     SegmentedItem(
-                                        title = "Thiết bị",
+                                        title = stringResource(R.string.home_device),
                                         subtitle = deviceModel,
                                         icon = Icons.Rounded.PhoneAndroid,
                                         iconTint = MaterialTheme.colorScheme.primary,
@@ -638,7 +693,7 @@ fun HomeScreen(
                                     )
 
                                     SegmentedItem(
-                                        title = "Phiên bản PrettieMBee",
+                                        title = stringResource(R.string.home_app_version),
                                         subtitle = "v${BuildConfig.VERSION_NAME} - ${BuildConfig.GIT_HASH}",
                                         icon = Icons.Rounded.Info,
                                         iconTint = MaterialTheme.colorScheme.primary,
@@ -666,7 +721,7 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     placeholder = {
                                         Text(
-                                            text = "Tìm theme theo tên hoặc tác giả...",
+                                            text = stringResource(R.string.store_search_hint),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                         )
@@ -674,7 +729,7 @@ fun HomeScreen(
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Rounded.Search,
-                                            contentDescription = "Search",
+                                            contentDescription = stringResource(R.string.store_search),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -684,7 +739,7 @@ fun HomeScreen(
                                             IconButton(onClick = { searchQuery = "" }) {
                                                 Icon(
                                                     imageVector = Icons.Rounded.Close,
-                                                    contentDescription = "Clear",
+                                                    contentDescription = stringResource(R.string.store_clear),
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                     modifier = Modifier.size(18.dp)
                                                 )
@@ -715,7 +770,7 @@ fun HomeScreen(
                                             onClick = { selectedCategory = category },
                                             label = {
                                                 Text(
-                                                    text = category,
+                                                    text = if (category == allCategoryKey) allCategoryLabel else category,
                                                     style = MaterialTheme.typography.labelMedium.copy(
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                         fontSize = 12.sp
@@ -742,7 +797,7 @@ fun HomeScreen(
                             // Filter Themes, then float pinned to top
                             val filteredThemes = communityThemes
                                 .filter { theme ->
-                                    val matchCategory = selectedCategory == "Tất cả" || theme.series == selectedCategory
+                                    val matchCategory = selectedCategory == allCategoryKey || theme.series == selectedCategory
                                     val matchQuery = searchQuery.isBlank() ||
                                             theme.name.contains(searchQuery, ignoreCase = true) ||
                                             theme.author.contains(searchQuery, ignoreCase = true) ||
@@ -763,7 +818,7 @@ fun HomeScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = if (selectedCategory == "Tất cả") "Tất cả theme" else selectedCategory,
+                                        text = if (selectedCategory == allCategoryKey) allCategoryLabel else selectedCategory,
                                         style = MaterialTheme.typography.titleSmall.copy(
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -774,7 +829,7 @@ fun HomeScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Text(
-                                            text = "${filteredThemes.size} theme",
+                                            text = stringResource(R.string.store_theme_count, filteredThemes.size),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                                         )
@@ -784,7 +839,7 @@ fun HomeScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Refresh,
-                                                contentDescription = "Đồng bộ từ GitHub",
+                                                contentDescription = stringResource(R.string.store_sync_github),
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -818,10 +873,10 @@ fun HomeScreen(
                             // MB Bank Configuration Group
                             item {
                                 SegmentedGroup(
-                                    title = "Cấu hình MB Bank"
+                                    title = stringResource(R.string.settings_mb_config)
                                 ) {
                                     SegmentedItem(
-                                        title = "Gói ứng dụng mục tiêu",
+                                        title = stringResource(R.string.settings_target_package),
                                         subtitle = targetPackage,
                                         icon = Icons.Rounded.Smartphone,
                                         iconTint = MaterialTheme.colorScheme.primary,
@@ -829,7 +884,7 @@ fun HomeScreen(
                                         trailingContent = {
                                             Icon(
                                                 imageVector = Icons.Rounded.Edit,
-                                                contentDescription = "Edit Package",
+                                                contentDescription = stringResource(R.string.settings_target_package),
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -840,7 +895,7 @@ fun HomeScreen(
                                     if (ThemeConfig.appliedNewThemeName != null) {
                                         val prioText = if (ThemeConfig.appliedIsPriority) " - Prio" else ""
                                         SegmentedItem(
-                                            title = "Theme đang kích hoạt",
+                                            title = stringResource(R.string.settings_active_theme),
                                             subtitle = "${ThemeConfig.appliedNewThemeName} - ${ThemeConfig.appliedOriginalThemeName}$prioText",
                                             icon = Icons.Rounded.Check,
                                             iconTint = MaterialTheme.colorScheme.primary,
@@ -849,7 +904,7 @@ fun HomeScreen(
                                                     onClick = { ThemeConfig.clearAppliedTheme(context) }
                                                 ) {
                                                     Text(
-                                                        text = "Đặt lại",
+                                                        text = stringResource(R.string.action_reset),
                                                         color = MaterialTheme.colorScheme.error,
                                                         fontWeight = FontWeight.SemiBold
                                                     )
@@ -864,12 +919,12 @@ fun HomeScreen(
                             // Appearance & Customization (KittiSU style)
                             item {
                                 SegmentedGroup(
-                                    title = "Giao diện & Chủ đề"
+                                    title = stringResource(R.string.settings_ui_theme)
                                 ) {
                                     // 1. Chế độ nền
                                     SegmentedItem(
-                                        title = "Chế độ nền",
-                                        subtitle = ThemeConfig.themeMode.title,
+                                        title = stringResource(R.string.settings_theme_mode),
+                                        subtitle = stringResource(ThemeConfig.themeMode.titleRes),
                                         icon = when (ThemeConfig.themeMode) {
                                             AppThemeMode.LIGHT -> Icons.Rounded.LightMode
                                             AppThemeMode.MATERIAL_DARK -> Icons.Rounded.DarkMode
@@ -880,7 +935,7 @@ fun HomeScreen(
                                         trailingContent = {
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = "Select Mode",
+                                                contentDescription = stringResource(R.string.settings_theme_mode),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                             )
                                         },
@@ -889,8 +944,8 @@ fun HomeScreen(
 
                                     // 2. Màu chủ đạo
                                     SegmentedItem(
-                                        title = "Màu chủ đạo",
-                                        subtitle = if (ThemeConfig.useBackgroundSeedColor && ThemeConfig.extractedSeedColor != null) "Đang dùng màu từ hình nền" else ThemeConfig.themeAccent.title,
+                                        title = stringResource(R.string.settings_accent_color),
+                                        subtitle = if (ThemeConfig.useBackgroundSeedColor && ThemeConfig.extractedSeedColor != null) stringResource(R.string.accent_seed_active) else stringResource(ThemeConfig.themeAccent.titleRes),
                                         icon = Icons.Rounded.Palette,
                                         iconTint = if (ThemeConfig.useBackgroundSeedColor && ThemeConfig.extractedSeedColor != null) ThemeConfig.extractedSeedColor!! else ThemeConfig.themeAccent.previewColor,
                                         trailingContent = {
@@ -914,7 +969,7 @@ fun HomeScreen(
                                                         if (isSelected) {
                                                             Icon(
                                                                 imageVector = Icons.Rounded.Check,
-                                                                contentDescription = "Selected",
+                                                                contentDescription = stringResource(R.string.action_apply),
                                                                 tint = Color.White,
                                                                 modifier = Modifier.size(14.dp)
                                                             )
@@ -928,8 +983,8 @@ fun HomeScreen(
 
                                     // 3. Lấy màu từ hình nền (Pick color from background)
                                     SegmentedItem(
-                                        title = "Lấy màu từ hình nền",
-                                        subtitle = if (ThemeConfig.appBackgroundUri != null) "Tự động trích xuất màu nhấn từ ảnh nền app" else "Cần đặt hình nền app trước",
+                                        title = stringResource(R.string.settings_seed_color),
+                                        subtitle = if (ThemeConfig.appBackgroundUri != null) stringResource(R.string.settings_seed_color_on) else stringResource(R.string.settings_seed_color_off),
                                         icon = Icons.Rounded.FormatColorFill,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         trailingContent = {
@@ -946,8 +1001,8 @@ fun HomeScreen(
 
                                     // 4. Nền Status Card (Custom background for status card)
                                     SegmentedItem(
-                                        title = "Nền Status Card",
-                                        subtitle = if (ThemeConfig.statusCardBackgroundUri != null) "Đã cài ảnh nền riêng cho thẻ" else "Mặc định (Không nền)",
+                                        title = stringResource(R.string.settings_status_card_bg),
+                                        subtitle = if (ThemeConfig.statusCardBackgroundUri != null) stringResource(R.string.settings_status_card_bg_set) else stringResource(R.string.settings_status_card_bg_none),
                                         icon = Icons.Rounded.Wallpaper,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         trailingContent = {
@@ -961,7 +1016,7 @@ fun HomeScreen(
                                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                                 ) {
                                                     Text(
-                                                        text = if (ThemeConfig.statusCardBackgroundUri != null) "Đổi" else "Chọn ảnh",
+                                                        text = if (ThemeConfig.statusCardBackgroundUri != null) stringResource(R.string.action_change) else stringResource(R.string.action_choose_image),
                                                         fontSize = 12.sp,
                                                         fontWeight = FontWeight.Medium
                                                     )
@@ -970,12 +1025,12 @@ fun HomeScreen(
                                                     IconButton(
                                                         onClick = {
                                                             ThemeConfig.saveStatusCardBackground(context, null)
-                                                            Toast.makeText(context, "Đã xoá nền thẻ", Toast.LENGTH_SHORT).show()
+                                                            Toast.makeText(context, context.getString(R.string.toast_status_bg_removed), Toast.LENGTH_SHORT).show()
                                                         }
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Rounded.Delete,
-                                                            contentDescription = "Xoá nền thẻ",
+                                                            contentDescription = stringResource(R.string.action_delete),
                                                             tint = MaterialTheme.colorScheme.error,
                                                             modifier = Modifier.size(18.dp)
                                                         )
@@ -988,8 +1043,8 @@ fun HomeScreen(
 
                                     // 5. Nền toàn ứng dụng (Full screen app background)
                                     SegmentedItem(
-                                        title = "Nền toàn ứng dụng",
-                                        subtitle = if (ThemeConfig.appBackgroundUri != null) "Đã cài hình nền app" else "Mặc định (Không nền)",
+                                        title = stringResource(R.string.settings_app_bg),
+                                        subtitle = if (ThemeConfig.appBackgroundUri != null) stringResource(R.string.settings_app_bg_set) else stringResource(R.string.settings_app_bg_none),
                                         icon = Icons.Rounded.Wallpaper,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         trailingContent = {
@@ -1003,7 +1058,7 @@ fun HomeScreen(
                                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                                 ) {
                                                     Text(
-                                                        text = if (ThemeConfig.appBackgroundUri != null) "Đổi" else "Chọn ảnh",
+                                                        text = if (ThemeConfig.appBackgroundUri != null) stringResource(R.string.action_change) else stringResource(R.string.action_choose_image),
                                                         fontSize = 12.sp,
                                                         fontWeight = FontWeight.Medium
                                                     )
@@ -1012,12 +1067,12 @@ fun HomeScreen(
                                                     IconButton(
                                                         onClick = {
                                                             ThemeConfig.saveAppBackground(context, null)
-                                                            Toast.makeText(context, "Đã xoá hình nền ứng dụng", Toast.LENGTH_SHORT).show()
+                                                            Toast.makeText(context, context.getString(R.string.toast_app_bg_removed), Toast.LENGTH_SHORT).show()
                                                         }
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Rounded.Delete,
-                                                            contentDescription = "Xoá nền app",
+                                                            contentDescription = stringResource(R.string.action_delete),
                                                             tint = MaterialTheme.colorScheme.error,
                                                             modifier = Modifier.size(18.dp)
                                                         )
@@ -1058,12 +1113,12 @@ fun HomeScreen(
                                                     }
                                                     Column {
                                                         Text(
-                                                            text = "Độ tối nền",
+                                                            text = stringResource(R.string.settings_bg_dim),
                                                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                                             color = MaterialTheme.colorScheme.onSurface
                                                         )
                                                         Text(
-                                                            text = "Điều chỉnh độ sẫm của hình nền app",
+                                                            text = stringResource(R.string.settings_bg_dim_desc),
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                                                         )
@@ -1120,12 +1175,12 @@ fun HomeScreen(
                                                 }
                                                 Column {
                                                     Text(
-                                                        text = "Độ trong suốt thẻ (Card Alpha)",
+                                                        text = stringResource(R.string.settings_card_alpha),
                                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )
                                                     Text(
-                                                        text = "Độ mờ thẻ hiển thị xuyên hình nền",
+                                                        text = stringResource(R.string.settings_card_alpha_desc),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                                                     )
@@ -1154,8 +1209,8 @@ fun HomeScreen(
 
                                     // 8. DPI ứng dụng
                                     SegmentedItem(
-                                        title = "DPI ứng dụng",
-                                        subtitle = if (ThemeConfig.appDpi <= 0) "Mặc định (Theo hệ thống)" else "${ThemeConfig.appDpi} DPI",
+                                        title = stringResource(R.string.settings_app_dpi),
+                                        subtitle = if (ThemeConfig.appDpi <= 0) stringResource(R.string.dpi_value) else "${ThemeConfig.appDpi} DPI",
                                         icon = Icons.Rounded.AspectRatio,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         onClick = {
@@ -1165,7 +1220,39 @@ fun HomeScreen(
                                         trailingContent = {
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = "Chỉnh DPI",
+                                                contentDescription = stringResource(R.string.settings_app_dpi),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        },
+                                        showDivider = false
+                                    )
+                                }
+                            }
+
+                            // Language
+                            item {
+                                SegmentedGroup(
+                                    title = stringResource(R.string.settings_language)
+                                ) {
+                                    SegmentedItem(
+                                        title = stringResource(R.string.settings_language),
+                                        subtitle = stringResource(R.string.settings_language_desc),
+                                        icon = Icons.Rounded.Language,
+                                        iconTint = MaterialTheme.colorScheme.primary,
+                                        onClick = { showLanguageDialog = true },
+                                        trailingContent = {
+                                            Text(
+                                                text = if (ThemeConfig.appLanguageTag == "vi") {
+                                                    stringResource(R.string.language_vietnamese)
+                                                } else {
+                                                    stringResource(R.string.language_english)
+                                                },
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.ChevronRight,
+                                                contentDescription = stringResource(R.string.settings_language),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                             )
                                         },
@@ -1177,18 +1264,18 @@ fun HomeScreen(
                             // Data & Utilities Group
                             item {
                                 SegmentedGroup(
-                                    title = "Hệ thống & Dữ liệu"
+                                    title = stringResource(R.string.settings_system_data)
                                 ) {
                                     SegmentedItem(
-                                        title = "Làm mới trạng thái",
-                                        subtitle = "Quét lại quyền root và kiểm tra ứng dụng MB",
+                                        title = stringResource(R.string.settings_refresh_status),
+                                        subtitle = stringResource(R.string.settings_refresh_status_desc),
                                         icon = Icons.Rounded.Refresh,
                                         iconTint = MaterialTheme.colorScheme.primary,
                                         onClick = onRefreshStatus,
                                         trailingContent = {
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = "Refresh",
+                                                contentDescription = stringResource(R.string.action_refresh),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                             )
                                         },
@@ -1196,7 +1283,7 @@ fun HomeScreen(
                                     )
 
                                     SegmentedItem(
-                                        title = "Thư mục lưu trữ theme",
+                                        title = stringResource(R.string.settings_theme_folder),
                                         subtitle = context.filesDir.resolve("themes").absolutePath,
                                         icon = Icons.Rounded.Storage,
                                         iconTint = MaterialTheme.colorScheme.primary,
@@ -1204,13 +1291,13 @@ fun HomeScreen(
                                     )
 
                                     SegmentedItem(
-                                        title = "Xoá toàn bộ theme MB Bank",
-                                        subtitle = "Gỡ bỏ tất cả theme đã nạp và hoàn tác về mặc định",
+                                        title = stringResource(R.string.settings_reset_themes),
+                                        subtitle = stringResource(R.string.settings_reset_themes_desc),
                                         icon = Icons.Rounded.DeleteForever,
                                         iconTint = MaterialTheme.colorScheme.error,
                                         onClick = {
                                             if (!isRootGranted) {
-                                                Toast.makeText(context, "Yêu cầu quyền root để thực hiện!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, context.getString(R.string.reset_needs_root), Toast.LENGTH_SHORT).show()
                                             } else {
                                                 showResetConfirmDialog = true
                                             }
@@ -1218,7 +1305,7 @@ fun HomeScreen(
                                         trailingContent = {
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = "Xoá theme",
+                                                contentDescription = stringResource(R.string.action_delete),
                                                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                                             )
                                         },
@@ -1245,12 +1332,12 @@ fun HomeScreen(
                     icon = {
                         Icon(
                             imageVector = Icons.Rounded.FolderOpen,
-                            contentDescription = "Nạp ZIP"
+                            contentDescription = stringResource(R.string.store_load_zip)
                         )
                     },
                     text = {
                         Text(
-                            text = "Nạp ZIP",
+                            text = stringResource(R.string.store_load_zip),
                             fontWeight = FontWeight.Bold
                         )
                     },
