@@ -1,5 +1,7 @@
 package anhiutangerine.prettiembee
 
+import android.content.Context
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -27,11 +29,16 @@ import anhiutangerine.prettiembee.ui.theme.PrettieMBeeTheme
 import anhiutangerine.prettiembee.ui.theme.ThemeConfig
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var rootRepository: RootRepository
     private lateinit var themeRepository: ThemeRepository
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(ThemeConfig.applyLocale(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
                 var selectedThemeForDetail by remember { mutableStateOf<CommunityTheme?>(null) }
                 var currentTargetUuid by remember { mutableStateOf("aa3cb89a-8325-41b4-b59b-dfaea086cf80") }
-                var currentTargetName by remember { mutableStateOf("Cánh Én Mùa Xuân") }
+                var currentTargetName by remember { mutableStateOf("") }
 
                 var isTargetPickerOpen by remember { mutableStateOf(false) }
 
@@ -85,7 +92,8 @@ class MainActivity : ComponentActivity() {
                             // Auto select first installed theme as default target if available
                             installedThemes.firstOrNull()?.let { first ->
                                 currentTargetUuid = first.uuid
-                                currentTargetName = first.storeTheme?.displayName ?: "Theme (${first.uuid.take(8)}...)"
+                                currentTargetName = first.storeTheme?.displayName
+                                    ?: applicationContext.getString(R.string.picker_theme_fallback, first.uuid.take(8))
                             }
                         }
                     }
@@ -115,7 +123,7 @@ class MainActivity : ComponentActivity() {
                             communityThemes = communityThemes,
                             isThemeDownloaded = { theme -> theme.id in downloadedThemeIds },
                             onRefreshStatus = {
-                                Toast.makeText(applicationContext, "Đang làm mới dữ liệu và đồng bộ kho theme...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(applicationContext, applicationContext.getString(R.string.toast_refreshing), Toast.LENGTH_SHORT).show()
                                 refreshAll()
                             },
                             onChangePackage = { newPkg ->
@@ -142,10 +150,10 @@ class MainActivity : ComponentActivity() {
                             },
                             onImportZip = { uri, fileName ->
                                 coroutineScope.launch {
-                                    Toast.makeText(applicationContext, "Đang xử lý file ZIP...", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(applicationContext, applicationContext.getString(R.string.toast_importing_zip), Toast.LENGTH_SHORT).show()
                                     val res = themeRepository.importCustomZip(uri, fileName)
                                     if (res.isSuccess) {
-                                        Toast.makeText(applicationContext, "Nạp theme thành công!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(applicationContext, applicationContext.getString(R.string.toast_import_success), Toast.LENGTH_SHORT).show()
                                         communityThemes = themeRepository.getCommunityThemes()
                                         downloadedThemeIds = communityThemes
                                             .filter { themeRepository.isThemeDownloaded(it) }
@@ -155,12 +163,16 @@ class MainActivity : ComponentActivity() {
                                             selectedThemeForDetail = imported
                                         }
                                     } else {
-                                        Toast.makeText(applicationContext, "Lỗi: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(applicationContext, applicationContext.getString(R.string.error_generic, res.exceptionOrNull()?.message ?: ""), Toast.LENGTH_LONG).show()
                                     }
                                 }
                             },
                             onResetThemes = {
                                 rootRepository.resetAllThemes()
+                            },
+                            onLanguageChange = { tag ->
+                                // this = MainActivity (not applicationContext) so recreate() runs
+                                ThemeConfig.saveAppLanguage(this@MainActivity, tag)
                             }
                         )
                     }
@@ -183,7 +195,8 @@ class MainActivity : ComponentActivity() {
                                 val initialLines = FlashScreenConstants.createInitialLogs(
                                     config = config,
                                     currentTargetName = currentTargetName,
-                                    targetPackage = targetPackage
+                                    targetPackage = targetPackage,
+                                    context = applicationContext
                                 )
                                 injectLogs.addAll(initialLines)
                                 isFlashScreenOpen = true
@@ -192,22 +205,22 @@ class MainActivity : ComponentActivity() {
                                     // Check if theme files exist locally
                                     var themeDir = themeRepository.getThemeDir(config.sourceTheme.id)
                                     if (!themeRepository.isThemeDownloaded(config.sourceTheme)) {
-                                        injectLogs.add("- Đang tải theme từ máy chủ...")
+                                        injectLogs.add(applicationContext.getString(R.string.flash_log_downloading))
                                         val dlRes = themeRepository.downloadTheme(config.sourceTheme) { progress ->
                                             val pct = (progress * 100).toInt()
                                             if (pct % 25 == 0) {
-                                                injectLogs.add("- Tiến độ tải: $pct%")
+                                                injectLogs.add(applicationContext.getString(R.string.flash_log_progress, pct))
                                             }
                                         }
                                         if (dlRes.isFailure) {
-                                            val err = "Tải theme thất bại: ${dlRes.exceptionOrNull()?.message}"
+                                            val err = applicationContext.getString(R.string.error_generic, dlRes.exceptionOrNull()?.message ?: "")
                                             injectLogs.add("- $err")
                                             flashFailedReason = err
                                             flashingStatus = FlashingStatus.FAILED
                                             return@launch
                                         }
                                         themeDir = dlRes.getOrThrow()
-                                        injectLogs.add("- Đã tải và giải nén theme.")
+                                        injectLogs.add(applicationContext.getString(R.string.flash_log_downloaded))
                                     }
 
                                     // Run Root Injection
@@ -230,7 +243,7 @@ class MainActivity : ComponentActivity() {
                                             targetUuid = config.targetUuid
                                         )
                                     } else {
-                                        val err = res.errorMessage ?: "Có lỗi xảy ra trong quá trình cài đặt"
+                                        val err = res.errorMessage ?: applicationContext.getString(R.string.operation_failed)
                                         flashFailedReason = err
                                         flashingStatus = FlashingStatus.FAILED
                                     }
