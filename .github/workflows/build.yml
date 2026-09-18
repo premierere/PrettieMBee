@@ -30,7 +30,7 @@ jobs:
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: PrettieMBee-debug-${{ github.ref_name }}
+        name: PrettieMBee-debug-${{ github.event.pull_request.number || github.run_number }}
         path: app/build/outputs/apk/debug/*.apk
 
     - name: Create GitHub Release on Tag
